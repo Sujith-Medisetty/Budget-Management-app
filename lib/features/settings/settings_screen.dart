@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/pocket_snackbar.dart';
 import '../../core/widgets/theme_toggle_button.dart';
 import '../../data/models/ai_config.dart';
+import '../../data/models/ai_log_entry.dart';
 import '../../providers/backup_provider.dart';
 import '../../providers/budget_preferences_provider.dart';
 import '../../providers/data_providers.dart';
@@ -46,64 +47,118 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Every tile on this screen reads one of these providers. We gate
+    // the entire body on all of them resolving so the screen paints
+    // once with real values — no per-tile spinner-in-icon, no
+    // "Set up AI" → real-provider snap, no "Sign in" → "Connected ✓"
+    // pop-in. The first navigation shows a single full-screen spinner
+    // until everything is settled; every subsequent navigation is
+    // instant because the providers are already cached.
     final aiCfg = ref.watch(aiConfigProvider);
+    final gmailAsync = ref.watch(gmailConnectedProvider);
     final notif = ref.watch(notificationsEnabledProvider);
+    final log = ref.watch(aiLogProvider);
+    final backupPrefs = ref.watch(backupPreferencesProvider);
+    final budgetPrefs = ref.watch(budgetPreferencesProvider);
+
+    final allLoaded = aiCfg.hasValue &&
+        gmailAsync.hasValue &&
+        notif.hasValue &&
+        log.hasValue &&
+        backupPrefs.loaded &&
+        budgetPrefs.loaded;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
         actions: const [ThemeToggleButton()],
       ),
-      body: SafeArea(
-        top: false,
-        // bottom: true (default) so the destructive "Delete account"
-        // tile at the bottom of the list never renders behind the
-        // system nav bar / gesture pill on phones — same behavior as
-        // iOS apps that respect the home-indicator safe area.
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pagePadding,
-            AppSpacing.md,
-            AppSpacing.pagePadding,
-            AppSpacing.floatingBarContentPadding,
-          ),
-        children: [
-          _AllowNotificationsTile(
-            enabled: notif,
-            onRequest: _requestNotifications,
-          ),
-          const SizedBox(height: AppSpacing.sectionGap),
-          const _SectionLabel('Accounts'),
-          const SizedBox(height: AppSpacing.sm),
-          const _ConnectedAccountsTile(),
-          const SizedBox(height: AppSpacing.sectionGap),
-          const _SectionLabel('AI model'),
-          const SizedBox(height: AppSpacing.sm),
-          _AIModelTile(
-            config: aiCfg,
-            onTap: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AiModelScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.sectionGap),
-          const _SectionLabel('Backup'),
-          const SizedBox(height: AppSpacing.sm),
-          const _BackupTile(),
-          const SizedBox(height: AppSpacing.sectionGap),
-          const _SectionLabel('Budgets'),
-          const SizedBox(height: AppSpacing.sm),
-          const _BudgetsTile(),
-          const SizedBox(height: AppSpacing.sectionGap),
-          const _SectionLabel('Diagnostics'),
-          const SizedBox(height: AppSpacing.sm),
-          const _ActivityLogTile(),
-          const _DocumentationTile(),
-          const SizedBox(height: AppSpacing.sectionGap),
-          const _SectionLabel('Danger zone'),
-          const SizedBox(height: AppSpacing.sm),
-          const _DeleteAccountTile(),
+      body: allLoaded
+          ? SafeArea(
+              top: false,
+              // bottom: true (default) so the destructive "Delete account"
+              // tile at the bottom of the list never renders behind the
+              // system nav bar / gesture pill on phones — same behavior as
+              // iOS apps that respect the home-indicator safe area.
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.pagePadding,
+                  AppSpacing.md,
+                  AppSpacing.pagePadding,
+                  AppSpacing.floatingBarContentPadding,
+                ),
+                children: [
+                  _AllowNotificationsTile(
+                    enabled: notif.requireValue,
+                    onRequest: _requestNotifications,
+                  ),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  const _SectionLabel('Accounts'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _ConnectedAccountsTile(email: gmailAsync.requireValue),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  const _SectionLabel('AI model'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _AIModelTile(
+                    config: aiCfg.requireValue,
+                    onTap: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const AiModelScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  const _SectionLabel('Backup'),
+                  const SizedBox(height: AppSpacing.sm),
+                  const _BackupTile(),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  const _SectionLabel('Budgets'),
+                  const SizedBox(height: AppSpacing.sm),
+                  const _BudgetsTile(),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  const _SectionLabel('Diagnostics'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _ActivityLogTile(entries: log.requireValue),
+                  _DocumentationTile(email: gmailAsync.requireValue),
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  const _SectionLabel('Danger zone'),
+                  const SizedBox(height: AppSpacing.sm),
+                  const _DeleteAccountTile(),
+                ],
+              ),
+            )
+          : const _SettingsLoading(),
+    );
+  }
+}
+
+/// Full-screen placeholder while the Settings screen waits for all
+/// six of its data providers to resolve (aiConfig, gmailConnected,
+/// notificationsEnabled, aiLog, backupPreferences, budgetPreferences).
+/// The ListView mounts only once every provider has settled — so the
+/// user sees one spinner, then the full screen at once with real
+/// values, never a half-loaded tile that snaps to its real state.
+class _SettingsLoading extends StatelessWidget {
+  const _SettingsLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Loading settings…',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
           ],
         ),
       ),
@@ -136,20 +191,17 @@ class _AllowNotificationsTile extends StatelessWidget {
     required this.enabled,
     required this.onRequest,
   });
-  final AsyncValue<bool> enabled;
+  final bool enabled;
   final Future<void> Function() onRequest;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final asyncEnabled = enabled;
-    final isLoading = asyncEnabled.isLoading;
-    final isEnabled = asyncEnabled.valueOrNull ?? false;
-    final hasError = asyncEnabled.hasError;
+    final isEnabled = enabled;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: (isLoading || isEnabled) ? null : onRequest,
+        onTap: isEnabled ? null : onRequest,
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Row(
@@ -158,31 +210,18 @@ class _AllowNotificationsTile extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: isLoading || hasError
-                      ? theme.colorScheme.surfaceContainerHigh
-                      : isEnabled
-                          ? AppColors.success.withValues(alpha: 0.14)
-                          : AppColors.amber.withValues(alpha: 0.18),
+                  color: isEnabled
+                      ? AppColors.success.withValues(alpha: 0.14)
+                      : AppColors.amber.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: isLoading
-                    ? const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        hasError
-                            ? Icons.help_outline_rounded
-                            : isEnabled
-                                ? Icons.campaign_rounded
-                                : Icons.notifications_off_rounded,
-                        color: hasError
-                            ? theme.colorScheme.onSurfaceVariant
-                            : isEnabled
-                                ? AppColors.success
-                                : AppColors.amber,
-                        size: 20,
-                      ),
+                child: Icon(
+                  isEnabled
+                      ? Icons.campaign_rounded
+                      : Icons.notifications_off_rounded,
+                  color: isEnabled ? AppColors.success : AppColors.amber,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -190,23 +229,19 @@ class _AllowNotificationsTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isLoading
-                          ? 'Notifications…'
-                          : isEnabled
-                              ? 'Showing in-app notifications'
-                              : 'Show in-app notifications',
+                      isEnabled
+                          ? 'Showing in-app notifications'
+                          : 'Show in-app notifications',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      isLoading
-                          ? 'Checking permission status.'
-                          : isEnabled
-                              ? 'Pocket pings you when a budget hits its threshold.'
-                              : 'Required for budget threshold alerts to appear. '
-                                  'Tap Allow when the system prompt appears.',
+                      isEnabled
+                          ? 'Pocket pings you when a budget hits its threshold.'
+                          : 'Required for budget threshold alerts to appear. '
+                              'Tap Allow when the system prompt appears.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -214,7 +249,7 @@ class _AllowNotificationsTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (!isLoading && !isEnabled)
+              if (!isEnabled)
                 TextButton(onPressed: onRequest, child: const Text('Allow')),
             ],
           ),
@@ -226,17 +261,15 @@ class _AllowNotificationsTile extends StatelessWidget {
 
 class _AIModelTile extends StatelessWidget {
   const _AIModelTile({required this.config, required this.onTap});
-  final AsyncValue<AiConfig> config;
+  final AiConfig config;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cfg = config.valueOrNull;
-    final isLoading = config.isLoading;
-    final hasKey = cfg?.hasKey ?? false;
-    final provider = cfg?.provider ?? CloudProvider.openai;
-    final model = cfg?.model ?? provider.defaultModel;
+    final hasKey = config.hasKey;
+    final provider = config.provider;
+    final model = config.model.isNotEmpty ? config.model : provider.defaultModel;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -250,25 +283,18 @@ class _AIModelTile extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: isLoading
-                      ? theme.colorScheme.surfaceContainerHigh
-                      : hasKey
-                          ? theme.colorScheme.primary.withValues(alpha: 0.14)
-                          : theme.colorScheme.surfaceContainerHigh,
+                  color: hasKey
+                      ? theme.colorScheme.primary.withValues(alpha: 0.14)
+                      : theme.colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: isLoading
-                    ? const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.psychology_rounded,
-                        color: hasKey
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant,
-                        size: 20,
-                      ),
+                child: Icon(
+                  Icons.psychology_rounded,
+                  color: hasKey
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -283,11 +309,9 @@ class _AIModelTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      isLoading
-                          ? 'Loading…'
-                          : hasKey
-                              ? '${provider.label} · $model'
-                              : 'Not configured — add a key to start parsing',
+                      hasKey
+                          ? '${provider.label} · $model'
+                          : 'Not configured — add a key to start parsing',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -307,15 +331,13 @@ class _AIModelTile extends StatelessWidget {
   }
 }
 
-class _ConnectedAccountsTile extends ConsumerWidget {
-  const _ConnectedAccountsTile();
+class _ConnectedAccountsTile extends StatelessWidget {
+  const _ConnectedAccountsTile({required this.email});
+  final String? email;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final asyncEmail = ref.watch(gmailConnectedProvider);
-    final isLoading = asyncEmail.isLoading;
-    final email = asyncEmail.valueOrNull;
     final connected = email != null;
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -331,25 +353,18 @@ class _ConnectedAccountsTile extends ConsumerWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: isLoading
-                      ? theme.colorScheme.surfaceContainerHigh
-                      : connected
-                          ? AppColors.success.withValues(alpha: 0.14)
-                          : theme.colorScheme.primary.withValues(alpha: 0.12),
+                  color: connected
+                      ? AppColors.success.withValues(alpha: 0.14)
+                      : theme.colorScheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: isLoading
-                    ? const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.account_circle_rounded,
-                        color: connected
-                            ? AppColors.success
-                            : theme.colorScheme.primary,
-                        size: 20,
-                      ),
+                child: Icon(
+                  Icons.account_circle_rounded,
+                  color: connected
+                      ? AppColors.success
+                      : theme.colorScheme.primary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -364,11 +379,9 @@ class _ConnectedAccountsTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      isLoading
-                          ? 'Loading…'
-                          : connected
-                              ? 'Gmail: $email'
-                              : 'Sign in with Google to capture Gmail transactions',
+                      connected
+                          ? 'Gmail: $email'
+                          : 'Sign in with Google to capture Gmail transactions',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -388,15 +401,13 @@ class _ConnectedAccountsTile extends ConsumerWidget {
   }
 }
 
-class _ActivityLogTile extends ConsumerWidget {
-  const _ActivityLogTile();
+class _ActivityLogTile extends StatelessWidget {
+  const _ActivityLogTile({required this.entries});
+  final List<AiLogEntry> entries;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final log = ref.watch(aiLogProvider);
-    final isLoading = log.isLoading;
-    final entries = log.valueOrNull ?? const [];
     final kept = entries.where((e) => e.isKept).length;
     final dropped = entries.where((e) => !e.isKept).length;
     final total = kept + dropped;
@@ -419,16 +430,11 @@ class _ActivityLogTile extends ConsumerWidget {
                   color: theme.colorScheme.primary.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: isLoading
-                    ? const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.manage_search_rounded,
-                        color: theme.colorScheme.primary,
-                        size: 20,
-                      ),
+                child: Icon(
+                  Icons.manage_search_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -443,11 +449,9 @@ class _ActivityLogTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      isLoading
-                          ? 'Loading…'
-                          : total == 0
-                              ? 'See what the AI parses, keeps, and drops'
-                              : 'Last $total: $kept kept · $dropped dropped',
+                      total == 0
+                          ? 'See what the AI parses, keeps, and drops'
+                          : 'Last $total: $kept kept · $dropped dropped',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -472,27 +476,23 @@ class _ActivityLogTile extends ConsumerWidget {
 /// [_ActivityLogTile] — the doc is bundled into the APK so there's no
 /// server-side check needed, but we still hide the tile for non-
 /// admins so the surface area stays small for normal users.
-class _DocumentationTile extends ConsumerWidget {
-  const _DocumentationTile();
+class _DocumentationTile extends StatelessWidget {
+  const _DocumentationTile({required this.email});
+  final String? email;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final asyncEmail = ref.watch(gmailConnectedProvider);
-    final isLoading = asyncEmail.isLoading;
-    final email = asyncEmail.valueOrNull;
     final isAdmin = email == kInfraAdminEmail;
-    if (!isLoading && !isAdmin) return const SizedBox.shrink();
+    if (!isAdmin) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.sm),
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: isAdmin
-              ? () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const DocsScreen()),
-                  )
-              : null,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const DocsScreen()),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Row(
@@ -501,21 +501,14 @@ class _DocumentationTile extends ConsumerWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: isLoading
-                        ? theme.colorScheme.surfaceContainerHigh
-                        : AppColors.amber.withValues(alpha: 0.14),
+                    color: AppColors.amber.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: isLoading
-                      ? const Padding(
-                          padding: EdgeInsets.all(10),
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(
-                          Icons.menu_book_rounded,
-                          color: AppColors.amber,
-                          size: 20,
-                        ),
+                  child: const Icon(
+                    Icons.menu_book_rounded,
+                    color: AppColors.amber,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -530,9 +523,7 @@ class _DocumentationTile extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isLoading
-                            ? 'Loading…'
-                            : 'Architecture, services, auth flows, endpoints',
+                        'Architecture, services, auth flows, endpoints',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
