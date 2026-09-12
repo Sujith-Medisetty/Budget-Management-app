@@ -1,0 +1,31 @@
+[Unit]
+Description=Pocket budget rollover (mint new month for every account)
+Documentation=file:///opt/pocket/server/tool/budget_rollover.dart
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Disable analytics to avoid the 2-3s startup pause on every fire.
+# Errors go to journald — `journalctl -u pocket-budget-rollover`
+# is the log.
+ExecStart=/usr/local/bin/dart --disable-analytics run /opt/pocket/server/tool/budget_rollover.dart
+WorkingDirectory=/opt/pocket/server
+EnvironmentFile=/opt/pocket/server/.env
+# Don't drop privileges — the script uses the same Postgres
+# connection as pocket-server (secrets live in /opt/pocket/server/.env
+# which is mode 0600 owned by opc, but User=root matches the rest
+# of the pocket-systemd services and avoids access-control drift).
+User=root
+Group=root
+# Budget: a few seconds is typical for a single user's account list.
+# Most months = near-zero rows minted (the sign-in path runs the
+# same logic in-process). Cap is generous so a slow Postgres
+# snapshot doesn't kill the run.
+TimeoutStartSec=300s
+# Capture both streams so failures aren't silently swallowed.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

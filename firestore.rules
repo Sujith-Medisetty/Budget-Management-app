@@ -1,0 +1,38 @@
+rules_version = '2';
+
+// Firestore security rules for Pocket.
+//
+// Auth model: the client signs in with a Firebase Auth custom token
+// minted by `/oauth/exchange`. The Firebase ID token's `sub` claim
+// equals the Google `sub`, which equals the Firestore document id
+// under `accounts/{sub}`. So the rule "this user can read/write
+// their own doc" is just `request.auth.token.sub == sub`.
+//
+// Service-account writes (server code, the trigger, the OAuth
+// exchange, etc.) bypass these rules — only client SDK calls are
+// gated.
+//
+// Before this file shipped, the project was in deny-default mode
+// (no rules file deployed), so every Firestore SDK call from the
+// client returned 403. Deploying this file is required for the
+// client-side direct-Firestore path to work.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Per-user config: backup prefs, filter rules, last-sync ts,
+    // last-backup ts, FCM tokens, refresh-token ciphertext, etc.
+    // Only the authenticated user can read or write their own doc.
+    match /accounts/{sub} {
+      allow read, write: if request.auth != null
+                         && request.auth.token.sub == sub;
+    }
+
+    // Default-deny everything else. The server uses the service
+    // account for admin operations; the client never reads any
+    // other collection today.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

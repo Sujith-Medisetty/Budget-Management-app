@@ -1,0 +1,93 @@
+name: pocket
+description: "Privacy-first budget app that reads PayPal and Google Pay notifications."
+publish_to: 'none'
+version: 1.0.0+2003
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State
+  flutter_riverpod: ^2.6.1
+
+  # Local DB
+  sqflite: ^2.4.1
+  path: ^1.9.0
+  path_provider: ^2.1.5
+
+  # Routing
+  go_router: ^14.6.2
+
+  # Local notifications (budget alerts)
+  flutter_local_notifications: ^18.0.1
+
+  # Secure storage for AI provider API keys
+  flutter_secure_storage: ^9.2.4
+
+  # HTTP for cloud AI providers (OpenAI / Anthropic / Google AI Studio)
+  dio: ^5.7.0
+
+  # Settings persistence
+  shared_preferences: ^2.3.4
+
+  # Utils
+  intl: ^0.20.1
+
+  # Typography
+  google_fonts: ^6.2.1
+  csv: ^8.0.0
+  share_plus: ^12.0.2
+  fl_chart: ^1.2.0
+
+  # Gmail capture (Phase 2)
+  google_sign_in: ^7.2.0
+  googleapis: ^17.0.0
+  googleapis_auth: ^2.3.3
+  extension_google_sign_in_as_googleapis_auth: ^3.0.0
+
+  # FCM (Phase 2 push notifications). firebase_messaging still uses
+  # firebase_core for its native config. firebase_auth + cloud_firestore
+  # were dropped with the GCP → Oracle VM migration — per-user account
+  # data lives in Postgres now and is read/written over the VM REST API
+  # via `accountsRepo`.
+  firebase_core: ^4.0.0
+  firebase_messaging: ^16.6.0
+
+  # Markdown rendering for AI text in chat + activity log
+  flutter_markdown: ^0.7.4+3
+
+  # On-device speech-to-text for the agent chat input. Uses Android's
+  # built-in SpeechRecognizer (Google's STT engine on Pixel devices) and
+  # iOS native SFSpeechRecognizer — both are accurate enough for
+  # dictating natural-language agent questions without sending audio to
+  # the cloud. Permission is requested lazily on first mic tap; the
+  # package falls back to a graceful "tap-to-type" UI when no engine is
+  # available.
+  speech_to_text: ^7.0.0
+
+  # Device-local IANA timezone lookup. The Backup screen captures the
+  # user's `America/Chicago`-style name on every save and ships it in
+  # PATCH /accounts/<sub> so the per-user systemd timer's UTC
+  # OnCalendar line is computed against the right local clock.
+  flutter_timezone: ^5.1.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
+  sqflite_common_ffi: ^2.4.2+1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/app_icon.png
+
+flutter_launcher_icons:
+  image_path: "assets/app_icon.png"
+  android: true
+  ios: false
+  min_sdk_android: 21

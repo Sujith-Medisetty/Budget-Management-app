@@ -1,0 +1,7 @@
+.dart_tool/
+.packages
+build/
+.env
+.env.local
+.service-account.json
+*.log

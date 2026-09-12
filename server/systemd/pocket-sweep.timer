@@ -1,0 +1,21 @@
+[Unit]
+Description=Pocket envelope TTL sweep (every 6 hours)
+Documentation=file:///opt/pocket/server/systemd/pocket-sweep.timer
+
+[Timer]
+# Fire at 00:00, 06:00, 12:00, 18:00 UTC every day. systemd uses the
+# VM's local timezone for OnCalendar — Oracle Linux 9 on Ampere runs
+# UTC by default, so this is also UTC. Adjust if the VM's TZ changes.
+OnCalendar=*-*-* 0/6:00:00
+# If the VM was off at a scheduled fire, run once on next boot to
+# catch up. Important for the monthly envelope backlog case where
+# a multi-day outage leaves rows past their 24h TTL.
+Persistent=true
+# Randomize the start by up to 60s to avoid hammering Postgres if
+# multiple timers align on the same minute.
+RandomizedDelaySec=60s
+# Use the pocket-sweep.service unit declared next to this file.
+Unit=pocket-sweep.service
+
+[Install]
+WantedBy=timers.target

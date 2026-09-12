@@ -1,0 +1,24 @@
+[Unit]
+Description=Pocket envelope TTL sweep
+Documentation=file:///opt/pocket/server/tool/sweep_envelopes_pg.dart
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Disable analytics to avoid the 2-3s startup pause on every fire.
+# Errors go to journald — `journalctl -u pocket-sweep` is the log.
+ExecStart=/usr/local/bin/dart --disable-analytics run /opt/pocket/server/tool/sweep_envelopes_pg.dart
+WorkingDirectory=/opt/pocket/server
+EnvironmentFile=/opt/pocket/server/.env
+# Don't drop privileges — pocket-server runs as root for now and the
+# sweep tool reads the same .env + opens the same DB.
+User=root
+Group=root
+TimeoutStartSec=120s
+# Capture both streams so failures aren't silently swallowed.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

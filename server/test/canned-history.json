@@ -1,0 +1,19 @@
+{
+  "messageIds": ["canned-msg-001", "canned-msg-002"],
+  "envelopes": [
+    {
+      "messageId": "canned-msg-001",
+      "from": "service@paypal.com",
+      "subject": "You sent $29.99 to Amazon",
+      "date": "2026-09-05T10:00:00.000Z",
+      "text": "You sent $29.99 USD to Amazon. Transaction ID: 5XY12345. Available balance: $1,234.56."
+    },
+    {
+      "messageId": "canned-msg-002",
+      "subject": "Chase: $120.00 debit card purchase",
+      "from": "no-reply@alertsp.chase.com",
+      "date": "2026-09-05T10:05:00.000Z",
+      "text": "A $120.00 debit card purchase was made at STARBUCKS on 09/04. Available balance: $5,432.10."
+    }
+  ]
+}

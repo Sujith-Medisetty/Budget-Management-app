@@ -1,0 +1,39 @@
+[Unit]
+Description=Pocket server (API + Pub/Sub push + per-user backup schedulers)
+Documentation=file:///opt/pocket/server/systemd/pocket-server.service
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Root, not opc: BackupScheduler writes per-user
+# `pocket-backup-<sub>.{service,timer}` units to /etc/systemd/system on
+# every PATCH /accounts/<sub> that touches backupPrefs. That requires
+# write access to /etc/systemd/system + the ability to talk to systemd.
+# pocket-sweep.service runs as root for the same reason.
+User=root
+Group=root
+WorkingDirectory=/opt/pocket/server
+# Disable dart CLI analytics — the CLI tries to write to $HOME which is
+# blocked by ProtectHome, and we don't want phone-home traffic from prod.
+Environment=DART_VM_OPTIONS=
+Environment=DART_ANALYTICS_DISABLE=1
+ExecStart=/usr/local/bin/dart --disable-analytics run bin/server.dart
+Restart=always
+RestartSec=3
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pocket-server
+
+NoNewPrivileges=true
+ProtectSystem=strict
+# ProtectHome=false: dart CLI tries to write $HOME/.dart/analytics
+# even with --disable-analytics, and ProtectHome makes /home/opc
+# read-only. Disable for now; we keep ProtectSystem=strict so the
+# rest of the FS stays untouched.
+ProtectHome=false
+ReadWritePaths=/var/lib/pocket/backups /opt/pocket/server /opt/pocket/secrets /etc/systemd/system
+
+[Install]
+WantedBy=multi-user.target

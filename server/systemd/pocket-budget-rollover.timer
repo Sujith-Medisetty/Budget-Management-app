@@ -1,0 +1,28 @@
+[Unit]
+Description=Pocket budget rollover (monthly on the 1st)
+Documentation=file:///opt/pocket/server/systemd/pocket-budget-rollover.service
+
+[Timer]
+# Fire at 00:05 UTC on the 1st of every month. systemd uses the
+# VM's local timezone for OnCalendar — Oracle Linux 9 on Ampere
+# runs UTC by default, so this is also UTC. Adjust if the VM's
+# TZ changes.
+#
+# Why 00:05 instead of 00:00: small jitter from the 1st-of-month
+# cron alignment; gives Postgres a moment to settle after any
+# midnight maintenance. Sign-in path handles mid-rollover coverage
+# anyway, so a delayed fire still lands the new month within
+# minutes of a user's first sign-in.
+OnCalendar=*-*-01 00:05:00
+# If the VM was off during the scheduled fire, run once on next
+# boot to catch up. A multi-day outage that straddles the 1st of
+# the month means the next boot mints the new month retroactively;
+# the first user to sign in after that sees the row already there.
+Persistent=true
+# Randomize start by up to 60s so a fleet of VMs can't all hammer
+# Postgres on the same instant (single-VM today; future-proof).
+RandomizedDelaySec=60s
+Unit=pocket-budget-rollover.service
+
+[Install]
+WantedBy=timers.target

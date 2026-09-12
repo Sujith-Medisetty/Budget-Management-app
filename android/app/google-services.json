@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "490595194764",
+    "project_id": "pocket-mail-sync",
+    "storage_bucket": "pocket-mail-sync.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:490595194764:android:17605a74cd12aece9fa8a9",
+        "android_client_info": {
+          "package_name": "com.limitless.pocket"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "490595194764-gginrnvmf24nivfbn0ehob20dd6d1urg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.limitless.pocket",
+            "certificate_hash": "a18b8c85d69933519628b759d9aa61b702b0362d"
+          }
+        },
+        {
+          "client_id": "490595194764-ng4mmjfe73l6n19jbnqr1iuc091nl49f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBERHOgPvsaUDXUFjwkk5aMSCRnMbjqvEA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "490595194764-ng4mmjfe73l6n19jbnqr1iuc091nl49f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
