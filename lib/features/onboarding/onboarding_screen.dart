@@ -70,12 +70,27 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // step is done. The per-page buttons already do this on the page
     // itself; the bottom bar used to ignore the state and made the
     // user think they still had to skip.
-    final gmailConnected =
-        ref.watch(gmailConnectedProvider).valueOrNull != null;
-    final hasAiKey = ref.watch(aiConfigProvider).maybeWhen(
-          data: (c) => c.hasKey,
-          orElse: () => false,
-        );
+    //
+    // Gate the whole screen until all three have resolved so the
+    // bottom bar doesn't snap from "Skip for now" (the default while
+    // loading) to "Next" once the providers settle. hasValue stays
+    // true through later invalidations — the cached value is kept
+    // while the future re-fires — so granting permission from inside
+    // the wizard doesn't kick the user back to the spinner.
+    final gmailAsync = ref.watch(gmailConnectedProvider);
+    final aiCfg = ref.watch(aiConfigProvider);
+    final notif = ref.watch(notificationsEnabledProvider);
+    if (!gmailAsync.hasValue || !aiCfg.hasValue || !notif.hasValue) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Welcome'),
+          actions: const [ThemeToggleButton()],
+        ),
+        body: const _OnboardingLoading(),
+      );
+    }
+    final gmailConnected = gmailAsync.requireValue != null;
+    final hasAiKey = aiCfg.requireValue.hasKey;
     // Notification permission is async — `_granted` lives inside the
     // page widget because it needs a one-shot refresh on mount. The
     // page exposes it via a provider so we can read it here too.
@@ -133,6 +148,25 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 final _notifGrantedProvider = StateProvider<bool>((_) => false);
 
 const _kStepCount = 5;
+
+/// Full-screen spinner while the three setup providers (Gmail
+/// connection, AI config, notification permission) resolve. Painted
+/// instead of the PageView so the bottom bar doesn't snap from its
+/// loading-time default ("Skip for now") to its real label ("Next")
+/// once they settle.
+class _OnboardingLoading extends StatelessWidget {
+  const _OnboardingLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(AppSpacing.xxl),
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+}
 
 class _ProgressDots extends StatelessWidget {
   const _ProgressDots({
