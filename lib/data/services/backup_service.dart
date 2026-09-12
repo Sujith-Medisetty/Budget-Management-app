@@ -33,11 +33,10 @@ import 'notification_service.dart';
 /// land in [BackupResult.error] as a human-readable string.
 class BackupService {
   BackupService({
-    required GmailAuth auth,
+    required this._auth,
     NotificationService? notifier,
     Dio? http,
-  })  : _auth = auth,
-        _notifier = notifier ?? NotificationService.instance,
+  })  : _notifier = notifier ?? NotificationService.instance,
         _http = http ??
             Dio(BaseOptions(
               connectTimeout: const Duration(seconds: 15),

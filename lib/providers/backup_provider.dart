@@ -209,13 +209,10 @@ class BackupAttempt {
 ///     old six-call churn.
 class BackupPreferencesController extends StateNotifier<BackupPreferences> {
   BackupPreferencesController({
-    required AccountsRepo repo,
-    required GmailAuth auth,
-    TimezoneService timezone = const TimezoneService(),
-  })  : _repo = repo,
-        _auth = auth,
-        _timezone = timezone,
-        super(BackupPreferences.defaults) {
+    required this._repo,
+    required this._auth,
+    this._timezone = const TimezoneService(),
+  })  : super(BackupPreferences.defaults) {
     if (kDebugMode) {
       debugPrint('[backup-prefs] controller constructed — firing _load()');
     }
@@ -516,7 +513,7 @@ extension BackupPreferencesTime on BackupPreferences {
     const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     // weekday is 1=Mon..7=Sun; map into the names array.
     final wd = weekdayNames[fire.weekday - 1];
-    return '$wd at ${scheduledTimeLabel}';
+    return '$wd at $scheduledTimeLabel';
   }
 }
 

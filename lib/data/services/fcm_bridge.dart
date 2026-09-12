@@ -34,18 +34,13 @@ import 'notification_pipeline.dart';
 /// before constructing the RawNotification.
 class FcmBridge {
   FcmBridge({
-    NotificationPipeline? pipeline,
-    GmailSync? gmailSync,
-    FilterRuleSet? rules,
-    GmailAuth? auth,
-    BackupService? backup,
-    AccountsRepo? accounts,
-  })  : _pipeline = pipeline,
-        _gmailSync = gmailSync,
-        _rules = rules,
-        _auth = auth,
-        _backup = backup,
-        _accounts = accounts;
+    this._pipeline,
+    this._gmailSync,
+    this._rules,
+    this._auth,
+    this._backup,
+    this._accounts,
+  });
   // Using the explicit field assignments to keep the constructor
   // signature stable for callers that override individual services
   // (e.g. the background isolate passes a pre-built BackupService).

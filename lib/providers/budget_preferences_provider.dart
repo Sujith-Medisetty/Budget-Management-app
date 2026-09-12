@@ -78,9 +78,8 @@ class BudgetPreferences {
 
 class BudgetPreferencesController extends StateNotifier<BudgetPreferences> {
   BudgetPreferencesController({
-    required AccountsRepo repo,
-  })  : _repo = repo,
-        super(BudgetPreferences.defaults) {
+    required this._repo,
+  })  : super(BudgetPreferences.defaults) {
     _load();
   }
 

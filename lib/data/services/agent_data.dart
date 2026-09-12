@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/budget.dart';
@@ -13,7 +12,6 @@ import '../../providers/backup_provider.dart';
 import 'ai_key_store.dart';
 import 'gmail_auth.dart';
 import 'gmail_filter_rules.dart';
-import 'gmail_sync.dart';
 import 'notification_service.dart';
 
 /// Local data access for the AI agent. Everything here runs against the
@@ -23,32 +21,20 @@ import 'notification_service.dart';
 /// model: the model only picks labels / chart kind / verbosity.
 class AgentData {
   AgentData({
-    required TransactionRepository txns,
-    required BudgetRepository budgets,
-    required SharedPreferences prefs,
-    required AiKeyStore aiKeyStore,
-    required FlutterSecureStorage secure,
-    required GmailAuth gmailAuth,
-    required GmailSync gmailSync,
-    required FilterRuleStore filterStore,
-    required BackupPreferences Function() readBackupPrefs,
-  })  : _txns = txns,
-        _budgets = budgets,
-        _prefs = prefs,
-        _aiKeyStore = aiKeyStore,
-        _secure = secure,
-        _gmailAuth = gmailAuth,
-        _gmailSync = gmailSync,
-        _filterStore = filterStore,
-        _readBackupPrefs = readBackupPrefs;
+    required this._txns,
+    required this._budgets,
+    required this._prefs,
+    required this._aiKeyStore,
+    required this._gmailAuth,
+    required this._filterStore,
+    required this._readBackupPrefs,
+  });
 
   final TransactionRepository _txns;
   final BudgetRepository _budgets;
   final SharedPreferences _prefs;
   final AiKeyStore _aiKeyStore;
-  final FlutterSecureStorage _secure;
   final GmailAuth _gmailAuth;
-  final GmailSync _gmailSync;
   final FilterRuleStore _filterStore;
   final BackupPreferences Function() _readBackupPrefs;
 
@@ -101,15 +87,15 @@ class AgentData {
   ///   "today" / "tdy"                  → today only
   ///   "yesterday"                      → yesterday only
   ///   "N days ago" / "N day ago"       → N days back (single day)
-  ///   "last <weekday>" / "<weekday>"   → most recent past <weekday>
+  ///   "last `<weekday>`" / "`<weekday>`" → most recent past `<weekday>`
   ///   "this week" / "current week"     → Mon..Sun of the current week
   ///   "last week" / "previous week"    → previous Mon..Sun
   ///   "past N days" / "last N days"    → N days back through today
   ///   "this month" / "current month"   → current calendar month
   ///   "last month" / "previous month"  → previous calendar month
-  ///   "in <month name>" / "<month name>" → that month in the current
-  ///                                        year (or last year if it
-  ///                                        hasn't happened yet)
+  ///   "in `<month name>`" / "`<month name>`" → that month in the current
+  ///                                            year (or last year if it
+  ///                                            hasn't happened yet)
   ///   "9/5" / "9-5" / "9/5/26"          → that month + day in current
   ///                                        year (or prior year if future)
   ({DateTime from, DateTime to, String label})? detectDateRange(String msg) {
@@ -253,8 +239,6 @@ class AgentData {
       );
       if (re.hasMatch(m)) {
         var year = now.year;
-        final monthEnd = DateTime(year, entry.value + 1, 1)
-            .subtract(const Duration(milliseconds: 1));
         // If the named month hasn't happened yet this year, fall back
         // to last year (e.g. user asks "in March" in April).
         if (entry.value > now.month) {
@@ -534,9 +518,7 @@ class AgentData {
     // remaining days, average daily burn, projected end-of-period.
     // Pulls from the budget's own period range so a weekly budget gets
     // day-of-week math against Mon..Sun rather than calendar month.
-    final activeRange = activeBudget == null
-        ? null
-        : activeBudget.period.range(
+    final activeRange = activeBudget?.period.range(
             now,
             customRange: (
               start: activeBudget.startDate,

@@ -8,7 +8,6 @@
 import 'package:dotenv/dotenv.dart';
 import 'package:logging/logging.dart';
 
-import 'package:pocket_server/backup_snapshot.dart';
 import 'package:pocket_server/r2_backup_store.dart';
 
 Future<void> main() async {
@@ -37,7 +36,7 @@ Future<void> main() async {
 
   // Use a unique sub so we don't clobber a real backup.
   const testSub = 'smoke-test-r2-001';
-  print('→ PUT  ${store.bucket}/${testSub}.json.gz');
+  print('→ PUT  ${store.bucket}/$testSub.json.gz');
   await store.put(
     testSub,
     transactions: [

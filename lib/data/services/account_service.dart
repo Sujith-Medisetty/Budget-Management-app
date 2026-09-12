@@ -25,10 +25,9 @@ import 'gmail_auth.dart';
 /// shouldn't be reordered by a caller who just awaits.
 class AccountService {
   AccountService({
-    required GmailAuth auth,
+    required this._auth,
     Dio? http,
-  })  : _auth = auth,
-        _http = http ??
+  })  : _http = http ??
             Dio(BaseOptions(
               connectTimeout: const Duration(seconds: 10),
               receiveTimeout: const Duration(seconds: 15),

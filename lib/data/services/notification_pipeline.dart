@@ -22,8 +22,8 @@ class NotificationPipeline {
     this._parser,
     this._txRepo,
     this._alerter, {
-    NotificationService? notifier,
-  }) : _notifier = notifier;
+    this._notifier,
+  });
 
   final ParserRouter _parser;
   final TransactionRepository _txRepo;

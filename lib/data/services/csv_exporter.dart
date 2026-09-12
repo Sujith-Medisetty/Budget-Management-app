@@ -70,7 +70,7 @@ class CsvExporter {
     return _bom + _serialize(rows);
   }
 
-  static final _csv = CsvCodec();
+  static final _csv = Csv();
 
   static String _serializeWithComment(
     List<List<String>> rows, {

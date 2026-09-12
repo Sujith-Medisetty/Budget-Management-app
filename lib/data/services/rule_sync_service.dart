@@ -36,11 +36,10 @@ class RuleSyncService {
   RuleSyncService({
     required this.auth,
     this.onSynced,
-    FilterRuleStore? filterStore,
+    this._filterStore,
     Dio? http,
     Duration? waitForInFlightTimeout,
   })  : _http = http ?? _defaultDio(),
-        _filterStore = filterStore,
         _waitForInFlightTimeout =
             waitForInFlightTimeout ?? const Duration(seconds: 25);
 

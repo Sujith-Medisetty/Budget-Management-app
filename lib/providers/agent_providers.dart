@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../data/models/agent_message.dart';
 import '../data/models/agent_response.dart';
@@ -27,9 +26,6 @@ final agentDataProvider = Provider<AgentData>((ref) {
   if (prefs == null || store == null) {
     throw const AgentMissingKeyException();
   }
-  const secure = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
   final filterStore = FilterRuleStore(ref.watch(accountsRepoProvider));
   // Best-effort warm-up so the first synchronous filterStore.read()
   // returns the real rules instead of defaults. The agent's
@@ -41,9 +37,7 @@ final agentDataProvider = Provider<AgentData>((ref) {
     budgets: ref.watch(budgetRepoProvider),
     prefs: prefs,
     aiKeyStore: store,
-    secure: secure,
     gmailAuth: ref.watch(gmailAuthProvider),
-    gmailSync: ref.watch(gmailSyncProvider),
     filterStore: filterStore,
     // `ref.read` (not watch) so a midnight auto-backup time change
     // doesn't rebuild the whole agent provider — the next snapshot

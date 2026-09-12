@@ -228,14 +228,6 @@ class _ConnectedAccountsScreenState
     // operations, and snackbars all happen inside the sheet itself.
     await showDisconnectSheet(context, ref);
   }
-
-  Future<void> _syncNow() async {
-    // Manual pull is gone — Pub/Sub push + FCM now delivers every new
-    // mail in real time (see docs/ADMIN_ARCHITECTURE.md §8). This
-    // method stays as a one-line stub for the agent verb
-    // `sync_gmail_now` so existing conversations don't blow up.
-    await ref.read(gmailSyncProvider).fetchNew();
-  }
 }
 
 class _EmailFiltersTile extends ConsumerWidget {
