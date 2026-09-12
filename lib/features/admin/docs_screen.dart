@@ -857,7 +857,7 @@ class _FlowTab extends StatelessWidget {
         ['gmail-api-push@system.gserviceaccount.com', 'Google\'s SA — not ours. Publishes to gmail-history topic. IAM = roles/pubsub.publisher.'],
         ['OAuth Web client', 'ng4mmjfe73l6n19jbnqr1iuc091nl49f… — server-side token exchange (auth-code + refresh grants).'],
         ['OAuth Android client', 'gginrnvmf24nivfbn0ehob20dd6d1urg… — mobile GoogleSignIn; package com.limitless.pocket; SHA-1 a18b8c85…'],
-        ['API key (Firebase)', 'AIzaSyBERHOgPvsaUDXUFjwkk5aMSCRnMbjqvEA — mobile talks to FIS + FCM. Lives in google-services.json.'],
+        ['API key (Firebase)', 'AIzaSy… — mobile talks to FIS + FCM. Lives in google-services.json (untracked, baked into APK at build time). Rotated 2026-09-12 after a public-repo leak.'],
       ])),
 
       const _SectionHeader(
@@ -873,6 +873,24 @@ class _FlowTab extends StatelessWidget {
           _InfoRow(text: 'Gmail needs gmail-api-push@system.gserviceaccount.com as publisher — we can\'t substitute our own SA.'),
         ],
       )),
+
+      const _SectionHeader(
+        title: 'Where credentials live across environments',
+        subtitle: 'Three systems, three credential sets. Each one lives '
+            'only where it needs to.',
+        icon: Icons.public_rounded,
+        tag: 'CROSS-ENV',
+      ),
+      _Card(child: _KvTable(rows: const [
+        ['CREDENTIAL', 'MAC DEV', 'VM PROD', 'PHONE'],
+        ['Firebase API key (AIzaSy…)', 'untracked .json', '—', 'baked into APK'],
+        ['server/.env (JWT, OAuth, FCM path)', 'untracked', 'preserved by deploy.sh', '—'],
+        ['FCM service account (server-side)', 'local copy in secrets/', 'only — server reads it', '—'],
+        ['Pub/Sub push SA (GCP-managed)', '—', 'GCP runtime identity', '—'],
+        ['apiToken (HS256 JWT, 90 d TTL)', '—', 'signs on /oauth/exchange', 'secure storage'],
+        ['OAuth refresh token', '—', 'AES-GCM in Postgres', '—'],
+        ['LLM keys (openai / anthropic / google)', '—', '—', 'secure storage'],
+      ])),
     ]);
   }
 }
