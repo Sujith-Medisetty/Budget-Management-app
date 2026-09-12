@@ -496,8 +496,32 @@ class _GmailPageState extends ConsumerState<_GmailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final email = ref.watch(gmailConnectedProvider).valueOrNull;
+    final asyncEmail = ref.watch(gmailConnectedProvider);
+    final email = asyncEmail.valueOrNull;
     final connected = email != null;
+    // While the future resolves the user would otherwise see
+    // "Sign in with Google" briefly before the page snaps to
+    // "Connected ✓" if they had already signed in earlier. Show a
+    // stable spinner instead so the page paints once.
+    if (asyncEmail.isLoading) {
+      return const _OnboardingScaffold(
+        icon: Icons.mail_rounded,
+        title: 'Connect Gmail?',
+        benefit: 'Capture transactions from any Gmail message — even ones '
+            'Gmail doesn\'t notify you about (Promotions, Updates, batched '
+            'alerts). Pocket fetches each email via Google\'s API and runs '
+            'it through your AI parser on-device.',
+        drawback: 'Google sees that Pocket accessed your mailbox. We '
+            'extract the body, parse it on your phone, then drop it. '
+            'Nothing is sent anywhere else.',
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
     if (connected) {
       return const _OnboardingScaffold(
         icon: Icons.mail_rounded,
@@ -521,8 +545,8 @@ class _GmailPageState extends ConsumerState<_GmailPage> {
           'alerts). Pocket fetches each email via Google\'s API and runs '
           'it through your AI parser on-device.',
       drawback: 'Google sees that Pocket accessed your mailbox. We '
-          'extract the body, parse it on your phone, then drop it. '
-          'Nothing is sent anywhere else.',
+            'extract the body, parse it on your phone, then drop it. '
+            'Nothing is sent anywhere else.',
       child: LoadingButton.filled(
         label: 'Sign in with Google',
         busyLabel: 'Opening Google…',
@@ -564,10 +588,9 @@ class _AIPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasKey = ref.watch(aiConfigProvider).maybeWhen(
-          data: (c) => c.hasKey,
-          orElse: () => false,
-        );
+    final cfgAsync = ref.watch(aiConfigProvider);
+    final hasKey = cfgAsync.valueOrNull?.hasKey ?? false;
+    final isLoading = cfgAsync.isLoading;
     return _OnboardingScaffold(
       icon: Icons.psychology_rounded,
       title: 'Add an AI key?',
@@ -576,9 +599,13 @@ class _AIPage extends ConsumerWidget {
           'Everything runs on your phone; your key never leaves the device.',
       drawback: 'Without a key, notifications come in but never become '
           'transactions. You can still add expenses manually.',
-      actionLabel: hasKey ? 'AI key saved ✓' : 'Set up AI',
+      actionLabel: isLoading
+          ? 'Loading…'
+          : hasKey
+              ? 'AI key saved ✓'
+              : 'Set up AI',
       onAction: () {
-        if (hasKey) return;
+        if (isLoading || hasKey) return;
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AiModelScreen()),
         );
@@ -596,24 +623,6 @@ class _BudgetAlertsPage extends ConsumerStatefulWidget {
 
 class _BudgetAlertsPageState extends ConsumerState<_BudgetAlertsPage> {
   bool _busy = false;
-  bool? _granted;
-
-  @override
-  void initState() {
-    super.initState();
-    _refresh();
-  }
-
-  Future<void> _refresh() async {
-    final enabled =
-        await ref.read(notificationServiceProvider).areNotificationsEnabled();
-    if (!mounted) return;
-    setState(() => _granted = enabled);
-    // Mirror the result into the top-level provider so the bottom bar
-    // can flip its label from "Skip for now" to "Next" the moment the
-    // user grants (or has already granted) the permission.
-    ref.read(_notifGrantedProvider.notifier).state = enabled;
-  }
 
   Future<void> _request() async {
     setState(() => _busy = true);
@@ -623,7 +632,12 @@ class _BudgetAlertsPageState extends ConsumerState<_BudgetAlertsPage> {
       // otherwise this step would no-op and the user couldn't grant
       // permission from the onboarding screen.
       await ref.read(notificationServiceProvider).requestPermission();
-      await _refresh();
+      ref.invalidate(notificationsEnabledProvider);
+      // Android 13+ may bounce the user to system settings if they
+      // denied twice — the provider re-read settles a beat later.
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      ref.invalidate(notificationsEnabledProvider);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -631,12 +645,25 @@ class _BudgetAlertsPageState extends ConsumerState<_BudgetAlertsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final granted = _granted ?? false;
+    final grantedAsync = ref.watch(notificationsEnabledProvider);
+    final granted = grantedAsync.valueOrNull ?? false;
+    final isLoading = grantedAsync.isLoading;
+    // Mirror the resolved value into the top-level provider so the
+    // bottom bar can flip its label from "Skip for now" to "Next" the
+    // moment the user grants (or has already granted) the permission.
+    if (grantedAsync.hasValue) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(_notifGrantedProvider.notifier).state = granted;
+      });
+    }
     final label = _busy
         ? 'Requesting…'
-        : granted
-            ? 'Allowed ✓'
-            : 'Allow notifications';
+        : isLoading
+            ? 'Checking…'
+            : granted
+                ? 'Allowed ✓'
+                : 'Allow notifications';
     return _OnboardingScaffold(
       icon: Icons.notifications_rounded,
       title: 'Budget alerts?',
@@ -646,7 +673,7 @@ class _BudgetAlertsPageState extends ConsumerState<_BudgetAlertsPage> {
       drawback: 'You\'ll have to open the app to check your budget '
           'status. Adjust per budget anytime in the Budgets tab.',
       actionLabel: label,
-      onAction: granted || _busy ? () {} : _request,
+      onAction: isLoading || granted || _busy ? () {} : _request,
     );
   }
 }

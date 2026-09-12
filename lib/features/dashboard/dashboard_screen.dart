@@ -87,8 +87,14 @@ class DashboardScreen extends ConsumerWidget {
                 if (b != null) {
                   return _ActiveBudgetCard(budget: b, txnsAsync: txnsAsync);
                 }
-                // No active budget. Show different hint depending on
-                // whether any budgets exist at all.
+                // No active budget. Don't paint the wrong hint while
+                // budgets is still resolving — fall through to the
+                // skeleton. Without this the user briefly sees "No
+                // budgets yet" before it snaps to "No active pick"
+                // (or vice-versa) when budgetsProvider settles.
+                if (allAsync.isLoading) {
+                  return const _Skeleton(height: 140);
+                }
                 final hasBudgets =
                     allAsync.valueOrNull?.isNotEmpty ?? false;
                 return hasBudgets

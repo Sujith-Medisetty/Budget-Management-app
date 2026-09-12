@@ -28,14 +28,49 @@ import 'model_picker_sheet.dart';
 ///
 /// Pocket parses strictly through the cloud AI — there is no fallback.
 /// Without a key, notifications come in but never become transactions.
-class AiModelScreen extends ConsumerStatefulWidget {
+class AiModelScreen extends ConsumerWidget {
   const AiModelScreen({super.key});
 
   @override
-  ConsumerState<AiModelScreen> createState() => _AiModelScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cfgAsync = ref.watch(aiConfigProvider);
+    return Scaffold(
+      appBar: AppBar(title: const Text('AI model')),
+      body: cfgAsync.when(
+        // Render a stable spinner until the SharedPreferences read
+        // settles — otherwise the form would briefly flash OpenAI /
+        // empty-model / empty-baseUrl defaults before snapping to the
+        // user's actual provider/model on the next frame.
+        loading: () => const Center(
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.xxl),
+            child: CircularProgressIndicator(),
+          ),
+        ),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Text(
+              'Couldn\'t load AI config: $e',
+              style: const TextStyle(color: AppColors.danger),
+            ),
+          ),
+        ),
+        data: (cfg) => _AiModelForm(initial: cfg),
+      ),
+    );
+  }
 }
 
-class _AiModelScreenState extends ConsumerState<AiModelScreen> {
+class _AiModelForm extends ConsumerStatefulWidget {
+  const _AiModelForm({required this.initial});
+  final AiConfig initial;
+
+  @override
+  ConsumerState<_AiModelForm> createState() => _AiModelFormState();
+}
+
+class _AiModelFormState extends ConsumerState<_AiModelForm> {
   late CloudProvider _provider;
   late TextEditingController _model;
   late TextEditingController _baseUrl;
@@ -47,12 +82,13 @@ class _AiModelScreenState extends ConsumerState<AiModelScreen> {
   @override
   void initState() {
     super.initState();
-    final cfg = ref.read(aiConfigProvider).valueOrNull;
-    _provider = cfg?.provider ?? CloudProvider.openai;
+    _provider = widget.initial.provider;
     _model = TextEditingController(
-      text: (cfg?.model.isNotEmpty ?? false) ? cfg!.model : _provider.defaultModel,
+      text: widget.initial.model.isNotEmpty
+          ? widget.initial.model
+          : _provider.defaultModel,
     );
-    _baseUrl = TextEditingController(text: cfg?.baseUrl ?? '');
+    _baseUrl = TextEditingController(text: widget.initial.baseUrl ?? '');
     _key = TextEditingController();
   }
 
@@ -199,126 +235,138 @@ class _AiModelScreenState extends ConsumerState<AiModelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('AI model'),
-        actions: [
-          LoadingButton.text(
-            label: 'Save',
-            busyLabel: 'Saving…',
-            busy: _saving,
-            onPressed: _saveAll,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.pagePadding,
-          AppSpacing.md,
-          AppSpacing.pagePadding,
-          AppSpacing.floatingBarContentPadding,
-        ),
-        children: [
-          _SectionLabel('Provider'),
-          const SizedBox(height: AppSpacing.sm),
-          RepaintBoundary(
-            child: _ProviderPicker(
-              value: _provider,
-              onChanged: _onProviderChanged,
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pagePadding,
+              AppSpacing.md,
+              AppSpacing.pagePadding,
+              AppSpacing.floatingBarContentPadding,
             ),
-          ),
-          const SizedBox(height: AppSpacing.sectionGap),
-          _SectionLabel('Model'),
-          const SizedBox(height: AppSpacing.sm),
-          RepaintBoundary(
-            child: _isCustom
-                ? TextField(
-                    controller: _model,
+            children: [
+              _SectionLabel('Provider'),
+              const SizedBox(height: AppSpacing.sm),
+              RepaintBoundary(
+                child: _ProviderPicker(
+                  value: _provider,
+                  onChanged: _onProviderChanged,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sectionGap),
+              _SectionLabel('Model'),
+              const SizedBox(height: AppSpacing.sm),
+              RepaintBoundary(
+                child: _isCustom
+                    ? TextField(
+                        controller: _model,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Model name',
+                          hintText:
+                              'e.g. deepseek-chat, mixtral-8x7b, llama-3.1-70b',
+                        ),
+                      )
+                    : _ModelPickerRow(
+                        provider: _provider,
+                        current: _model.text,
+                        onPick: (v) => setState(() {
+                          _model.text = v;
+                          _model.selection =
+                              TextSelection.collapsed(offset: v.length);
+                        }),
+                      ),
+              ),
+              if (_isCustom) ...[
+                const SizedBox(height: AppSpacing.lg),
+                _SectionLabel('Base URL'),
+                const SizedBox(height: AppSpacing.sm),
+                RepaintBoundary(
+                  child: TextField(
+                    controller: _baseUrl,
+                    keyboardType: TextInputType.url,
+                    autocorrect: false,
+                    enableSuggestions: false,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
-                      labelText: 'Model name',
-                      hintText:
-                          'e.g. deepseek-chat, mixtral-8x7b, llama-3.1-70b',
+                      labelText: 'https://…/v1',
+                      hintText: 'e.g. https://api.deepseek.com/v1',
+                      helperText: 'We append /chat/completions to this.',
                     ),
-                  )
-                : _ModelPickerRow(
-                    provider: _provider,
-                    current: _model.text,
-                    onPick: (v) => setState(() {
-                      _model.text = v;
-                      _model.selection =
-                          TextSelection.collapsed(offset: v.length);
-                    }),
                   ),
-          ),
-          if (_isCustom) ...[
-            const SizedBox(height: AppSpacing.lg),
-            _SectionLabel('Base URL'),
-            const SizedBox(height: AppSpacing.sm),
-            RepaintBoundary(
-              child: TextField(
-                controller: _baseUrl,
-                keyboardType: TextInputType.url,
-                autocorrect: false,
-                enableSuggestions: false,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'https://…/v1',
-                  hintText: 'e.g. https://api.deepseek.com/v1',
-                  helperText: 'We append /chat/completions to this.',
                 ),
-              ),
-            ),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          _SectionLabel('API key'),
-          const SizedBox(height: AppSpacing.sm),
-          RepaintBoundary(
-            child: TextField(
-              controller: _key,
-              obscureText: _obscureKey,
-              keyboardType: TextInputType.visiblePassword,
-              autocorrect: false,
-              enableSuggestions: false,
-              inputFormatters: [
-                FilteringTextInputFormatter.deny(RegExp(r'\s')),
               ],
-              decoration: InputDecoration(
-                labelText: 'Paste your key',
-                hintText: 'Stored on-device, never sent to us',
-                suffixIcon: IconButton(
-                  icon: Icon(_obscureKey
-                      ? Icons.visibility_rounded
-                      : Icons.visibility_off_rounded),
-                  onPressed: () =>
-                      setState(() => _obscureKey = !_obscureKey),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _test is _TestRunning ? null : _testConnection,
-                  icon: const Icon(Icons.wifi_tethering_rounded, size: 18),
-                  label: Text(
-                    _test is _TestRunning
-                        ? 'Testing…'
-                        : 'Test connection',
+              const SizedBox(height: AppSpacing.lg),
+              _SectionLabel('API key'),
+              const SizedBox(height: AppSpacing.sm),
+              RepaintBoundary(
+                child: TextField(
+                  controller: _key,
+                  obscureText: _obscureKey,
+                  keyboardType: TextInputType.visiblePassword,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Paste your key',
+                    hintText: 'Stored on-device, never sent to us',
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureKey
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded),
+                      onPressed: () =>
+                          setState(() => _obscureKey = !_obscureKey),
+                    ),
                   ),
                 ),
               ),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _test is _TestRunning ? null : _testConnection,
+                      icon: const Icon(Icons.wifi_tethering_rounded, size: 18),
+                      label: Text(
+                        _test is _TestRunning
+                            ? 'Testing…'
+                            : 'Test connection',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _TestStatusTile(state: _test),
+              const SizedBox(height: AppSpacing.lg),
+              _HelpLink(provider: _provider),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          _TestStatusTile(state: _test),
-          const SizedBox(height: AppSpacing.lg),
-          _HelpLink(provider: _provider),
-        ],
-      ),
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pagePadding,
+              AppSpacing.sm,
+              AppSpacing.pagePadding,
+              AppSpacing.sm,
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: LoadingButton.filled(
+                label: 'Save',
+                busyLabel: 'Saving…',
+                busy: _saving,
+                onPressed: _saveAll,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

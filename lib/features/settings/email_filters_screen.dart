@@ -155,7 +155,19 @@ class _EmailFiltersScreenState extends ConsumerState<EmailFiltersScreen> {
           ),
         ],
       ),
-      body: ListView(
+      // Until the controller's two async reads (local mirror, then
+      // cloud) have both landed, render a skeleton instead of the
+      // default `FilterRuleSet.defaults` — otherwise the user sees
+      // "Capture every Gmail message" / 0 rules for a frame before
+      // it snaps to their real rules.
+      body: !controller.loaded
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.xxl),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          : ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.pagePadding,
           AppSpacing.sm,

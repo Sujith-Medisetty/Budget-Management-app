@@ -932,27 +932,28 @@ class _SuggestionStrip extends ConsumerWidget {
     final suggestionsAsync = ref.watch(agentSuggestionsProvider);
     if (hasText) return const SizedBox.shrink();
 
+    // `valueOrNull` returns the previous chip list while a new
+    // signature (EMPTY→PENDING→DONE) is being fetched, so the chips
+    // don't blink to empty between turns. On the very first load
+    // it's null → empty list → strip stays empty until the first
+    // batch resolves.
+    final suggestions = suggestionsAsync.valueOrNull ?? const <String>[];
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+
     return SizedBox(
       height: 40,
-      child: suggestionsAsync.when(
-        loading: () => const SizedBox.shrink(),
-        error: (_, _) => const SizedBox.shrink(),
-        data: (suggestions) {
-          if (suggestions.isEmpty) return const SizedBox.shrink();
-          return ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.pagePadding,
-              vertical: AppSpacing.xs,
-            ),
-            itemCount: suggestions.length,
-            separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
-            itemBuilder: (_, i) => _SuggestionChip(
-              text: suggestions[i],
-              onTap: () => _apply(context, suggestions[i]),
-            ),
-          );
-        },
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.pagePadding,
+          vertical: AppSpacing.xs,
+        ),
+        itemCount: suggestions.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+        itemBuilder: (_, i) => _SuggestionChip(
+          text: suggestions[i],
+          onTap: () => _apply(context, suggestions[i]),
+        ),
       ),
     );
   }

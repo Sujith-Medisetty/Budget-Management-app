@@ -36,32 +36,18 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool? _notificationsEnabled;
-
-  @override
-  void initState() {
-    super.initState();
-    _refreshNotificationsEnabled();
-  }
-
-  Future<void> _refreshNotificationsEnabled() async {
-    final enabled =
-        await ref.read(notificationServiceProvider).areNotificationsEnabled();
-    if (!mounted) return;
-    setState(() => _notificationsEnabled = enabled);
-  }
-
   Future<void> _requestNotifications() async {
     await ref.read(notificationServiceProvider).requestPermission();
     // Android 13+ may bounce the user to system settings if they denied
     // twice. Re-query after a beat so the tile reflects the final state.
     await Future<void>.delayed(const Duration(milliseconds: 600));
-    await _refreshNotificationsEnabled();
+    ref.invalidate(notificationsEnabledProvider);
   }
 
   @override
   Widget build(BuildContext context) {
     final aiCfg = ref.watch(aiConfigProvider);
+    final notif = ref.watch(notificationsEnabledProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -83,7 +69,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         children: [
           _AllowNotificationsTile(
-            enabled: _notificationsEnabled,
+            enabled: notif,
             onRequest: _requestNotifications,
           ),
           const SizedBox(height: AppSpacing.sectionGap),
@@ -94,7 +80,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const _SectionLabel('AI model'),
           const SizedBox(height: AppSpacing.sm),
           _AIModelTile(
-            config: aiCfg.valueOrNull,
+            config: aiCfg,
             onTap: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const AiModelScreen()),
@@ -150,17 +136,20 @@ class _AllowNotificationsTile extends StatelessWidget {
     required this.enabled,
     required this.onRequest,
   });
-  final bool? enabled;
+  final AsyncValue<bool> enabled;
   final Future<void> Function() onRequest;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isEnabled = enabled ?? false;
+    final asyncEnabled = enabled;
+    final isLoading = asyncEnabled.isLoading;
+    final isEnabled = asyncEnabled.valueOrNull ?? false;
+    final hasError = asyncEnabled.hasError;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: isEnabled ? null : onRequest,
+        onTap: (isLoading || isEnabled) ? null : onRequest,
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Row(
@@ -169,18 +158,31 @@ class _AllowNotificationsTile extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: isEnabled
-                      ? AppColors.success.withValues(alpha: 0.14)
-                      : AppColors.amber.withValues(alpha: 0.18),
+                  color: isLoading || hasError
+                      ? theme.colorScheme.surfaceContainerHigh
+                      : isEnabled
+                          ? AppColors.success.withValues(alpha: 0.14)
+                          : AppColors.amber.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  isEnabled
-                      ? Icons.campaign_rounded
-                      : Icons.notifications_off_rounded,
-                  color: isEnabled ? AppColors.success : AppColors.amber,
-                  size: 20,
-                ),
+                child: isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        hasError
+                            ? Icons.help_outline_rounded
+                            : isEnabled
+                                ? Icons.campaign_rounded
+                                : Icons.notifications_off_rounded,
+                        color: hasError
+                            ? theme.colorScheme.onSurfaceVariant
+                            : isEnabled
+                                ? AppColors.success
+                                : AppColors.amber,
+                        size: 20,
+                      ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -188,19 +190,23 @@ class _AllowNotificationsTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isEnabled
-                          ? 'Showing in-app notifications'
-                          : 'Show in-app notifications',
+                      isLoading
+                          ? 'Notifications…'
+                          : isEnabled
+                              ? 'Showing in-app notifications'
+                              : 'Show in-app notifications',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      isEnabled
-                          ? 'Pocket pings you when a budget hits its threshold.'
-                          : 'Required for budget threshold alerts to appear. '
-                              'Tap Allow when the system prompt appears.',
+                      isLoading
+                          ? 'Checking permission status.'
+                          : isEnabled
+                              ? 'Pocket pings you when a budget hits its threshold.'
+                              : 'Required for budget threshold alerts to appear. '
+                                  'Tap Allow when the system prompt appears.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -208,7 +214,7 @@ class _AllowNotificationsTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (!isEnabled)
+              if (!isLoading && !isEnabled)
                 TextButton(onPressed: onRequest, child: const Text('Allow')),
             ],
           ),
@@ -220,15 +226,17 @@ class _AllowNotificationsTile extends StatelessWidget {
 
 class _AIModelTile extends StatelessWidget {
   const _AIModelTile({required this.config, required this.onTap});
-  final AiConfig? config;
+  final AsyncValue<AiConfig> config;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasKey = config?.hasKey ?? false;
-    final provider = config?.provider ?? CloudProvider.openai;
-    final model = config?.model ?? provider.defaultModel;
+    final cfg = config.valueOrNull;
+    final isLoading = config.isLoading;
+    final hasKey = cfg?.hasKey ?? false;
+    final provider = cfg?.provider ?? CloudProvider.openai;
+    final model = cfg?.model ?? provider.defaultModel;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -242,18 +250,25 @@ class _AIModelTile extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: hasKey
-                      ? theme.colorScheme.primary.withValues(alpha: 0.14)
-                      : theme.colorScheme.surfaceContainerHigh,
+                  color: isLoading
+                      ? theme.colorScheme.surfaceContainerHigh
+                      : hasKey
+                          ? theme.colorScheme.primary.withValues(alpha: 0.14)
+                          : theme.colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  Icons.psychology_rounded,
-                  color: hasKey
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                  size: 20,
-                ),
+                child: isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        Icons.psychology_rounded,
+                        color: hasKey
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                        size: 20,
+                      ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -268,9 +283,11 @@ class _AIModelTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      hasKey
-                          ? '${provider.label} · $model'
-                          : 'Not configured — add a key to start parsing',
+                      isLoading
+                          ? 'Loading…'
+                          : hasKey
+                              ? '${provider.label} · $model'
+                              : 'Not configured — add a key to start parsing',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -296,7 +313,9 @@ class _ConnectedAccountsTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final email = ref.watch(gmailConnectedProvider).valueOrNull;
+    final asyncEmail = ref.watch(gmailConnectedProvider);
+    final isLoading = asyncEmail.isLoading;
+    final email = asyncEmail.valueOrNull;
     final connected = email != null;
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -312,18 +331,25 @@ class _ConnectedAccountsTile extends ConsumerWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: connected
-                      ? AppColors.success.withValues(alpha: 0.14)
-                      : theme.colorScheme.primary.withValues(alpha: 0.12),
+                  color: isLoading
+                      ? theme.colorScheme.surfaceContainerHigh
+                      : connected
+                          ? AppColors.success.withValues(alpha: 0.14)
+                          : theme.colorScheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  Icons.account_circle_rounded,
-                  color: connected
-                      ? AppColors.success
-                      : theme.colorScheme.primary,
-                  size: 20,
-                ),
+                child: isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        Icons.account_circle_rounded,
+                        color: connected
+                            ? AppColors.success
+                            : theme.colorScheme.primary,
+                        size: 20,
+                      ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -338,9 +364,11 @@ class _ConnectedAccountsTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      connected
-                          ? 'Gmail: $email'
-                          : 'Sign in with Google to capture Gmail transactions',
+                      isLoading
+                          ? 'Loading…'
+                          : connected
+                              ? 'Gmail: $email'
+                              : 'Sign in with Google to capture Gmail transactions',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -367,12 +395,10 @@ class _ActivityLogTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final log = ref.watch(aiLogProvider);
-    final kept = (log.valueOrNull ?? const [])
-        .where((e) => e.isKept)
-        .length;
-    final dropped = (log.valueOrNull ?? const [])
-        .where((e) => !e.isKept)
-        .length;
+    final isLoading = log.isLoading;
+    final entries = log.valueOrNull ?? const [];
+    final kept = entries.where((e) => e.isKept).length;
+    final dropped = entries.where((e) => !e.isKept).length;
     final total = kept + dropped;
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -393,11 +419,16 @@ class _ActivityLogTile extends ConsumerWidget {
                   color: theme.colorScheme.primary.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  Icons.manage_search_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 20,
-                ),
+                child: isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        Icons.manage_search_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -412,9 +443,11 @@ class _ActivityLogTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      total == 0
-                          ? 'See what the AI parses, keeps, and drops'
-                          : 'Last $total: $kept kept · $dropped dropped',
+                      isLoading
+                          ? 'Loading…'
+                          : total == 0
+                              ? 'See what the AI parses, keeps, and drops'
+                              : 'Last $total: $kept kept · $dropped dropped',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -445,17 +478,21 @@ class _DocumentationTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final email = ref.watch(gmailConnectedProvider).valueOrNull;
+    final asyncEmail = ref.watch(gmailConnectedProvider);
+    final isLoading = asyncEmail.isLoading;
+    final email = asyncEmail.valueOrNull;
     final isAdmin = email == kInfraAdminEmail;
-    if (!isAdmin) return const SizedBox.shrink();
+    if (!isLoading && !isAdmin) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.sm),
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const DocsScreen()),
-          ),
+          onTap: isAdmin
+              ? () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const DocsScreen()),
+                  )
+              : null,
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Row(
@@ -464,14 +501,21 @@ class _DocumentationTile extends ConsumerWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: AppColors.amber.withValues(alpha: 0.14),
+                    color: isLoading
+                        ? theme.colorScheme.surfaceContainerHigh
+                        : AppColors.amber.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.menu_book_rounded,
-                    color: AppColors.amber,
-                    size: 20,
-                  ),
+                  child: isLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(
+                          Icons.menu_book_rounded,
+                          color: AppColors.amber,
+                          size: 20,
+                        ),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -486,7 +530,9 @@ class _DocumentationTile extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Architecture, services, auth flows, endpoints',
+                        isLoading
+                            ? 'Loading…'
+                            : 'Architecture, services, auth flows, endpoints',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),

@@ -231,6 +231,15 @@ final notificationServiceProvider = Provider<NotificationService>(
   (ref) => NotificationService.instance,
 );
 
+/// Whether the user has granted POST_NOTIFICATIONS (Android 13+).
+/// Async because the platform-channel call is asynchronous. Drives
+/// the Settings "Allow notifications" tile and the onboarding budget
+/// alerts step — both consume via `.when` so they don't paint a
+/// default before the platform call returns.
+final notificationsEnabledProvider = FutureProvider<bool>((ref) async {
+  return ref.watch(notificationServiceProvider).areNotificationsEnabled();
+});
+
 /// Eagerly initializes flutter_local_notifications on boot so budget
 /// threshold alerts have a ready channel. Call from a root widget.
 final initializeNotificationsProvider = Provider<void>((ref) {
@@ -265,6 +274,8 @@ class GmailFilterRulesController extends StateNotifier<FilterRuleSet> {
   GmailFilterRulesController(this._store, FilterRuleSet initial)
       : super(initial);
   final FilterRuleStore _store;
+  bool _loaded = false;
+  bool get loaded => _loaded;
 
   Future<void> update(FilterRuleSet next) async {
     await _store.write(next);
@@ -283,6 +294,16 @@ class GmailFilterRulesController extends StateNotifier<FilterRuleSet> {
   /// Gmail filter on every save.
   void replaceFromSync(FilterRuleSet merged) {
     state = merged;
+  }
+
+  /// Marks the controller as having finished its initial loads
+  /// (local mirror + cloud). The EmailFiltersScreen reads this to
+  /// decide whether to render the real rules or a loading skeleton.
+  void markLoaded() {
+    _loaded = true;
+    // Re-publish state so consumers watching the provider rebuild
+    // and observe `loaded == true`.
+    state = state;
   }
 }
 
@@ -310,6 +331,7 @@ final gmailFilterRulesProvider =
     }
     final loaded = await store.loadFromDisk();
     controller.replaceFromSync(loaded);
+    controller.markLoaded();
   });
   return controller;
 });
