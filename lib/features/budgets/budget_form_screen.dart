@@ -125,22 +125,16 @@ class _BudgetFormScreenState extends ConsumerState<BudgetFormScreen> {
           );
 
     final repo = ref.read(budgetRepoProvider);
-    final created = widget.existing == null ? await repo.insert(b) : null;
     if (widget.existing != null) {
       await repo.update(b);
-    } else if (created != null) {
+    } else {
+      final created = await repo.insert(b);
       // First budget ever? Auto-activate so the dashboard isn't dead.
-      final all = await repo.all();
-      if (all.length == 1) await repo.activate(created);
+      if (created != null && (await repo.all()).length == 1) {
+        await repo.activate(created);
+      }
     }
-    // Mirror the alert prefs to the server's `budgets` row so a
-    // sign-out/sign-in cycle (or a fresh install that pulls from the
-    // server) sees the same notify mode. Server matches by
-    // (name, start_date); a 404 means the budget is locally-only
-    // (manual creation without auto-create) and the call returns
-    // true as a no-op. Fire-and-forget — local SQLite is already
-    // updated and the next restore-from-server path will pick up
-    // the latest local state.
+    // Mirror alert prefs server-side; 404 means locally-only budget.
     try {
       await BudgetsApi(auth: ref.read(gmailAuthProvider)).patchAlertPrefs(
         name: b.name,

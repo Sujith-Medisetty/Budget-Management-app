@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:googleapis/gmail/v1.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 
@@ -116,8 +115,5 @@ class GmailWatchRegistrar {
 }
 
 /// We don't use the generated GmailApi directly because we already have
-/// a raw-HTTP path working. Keeping this class as a placeholder so we
-/// can refactor to the typed client later without ripping up callers.
-class _UnusedGmailApiRef {
-  void _ref(GmailApi _) {}
-}
+/// a raw-HTTP path working. We can refactor to the typed client later
+/// without ripping up callers by adding it back as a regular import.

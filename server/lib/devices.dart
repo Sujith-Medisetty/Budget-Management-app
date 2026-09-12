@@ -4,8 +4,6 @@ import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart';
 
 import 'auth.dart';
-import 'config.dart';
-import 'crypto.dart';
 import 'token_store.dart';
 
 /// `POST /devices/register` — mobile sends `{apiToken, fcmToken}` after
@@ -13,9 +11,7 @@ import 'token_store.dart';
 /// the FCM token to the account's `fcmTokens` set. The Pub/Sub handler
 /// uses this set when publishing push notifications.
 Handler devicesRegister(
-  ServerConfig config,
   TokenStore tokens,
-  TokenCipher cipher,
   TokenAuth auth,
 ) {
   final log = Logger('devices');
@@ -68,22 +64,12 @@ Handler devicesRegister(
   };
 }
 
-/// `POST /devices/signout` — mobile sends `{apiToken, fcmToken}` when
-/// the user logs out or the FCM token rotates. We remove that one
-/// token from the account. We deliberately do NOT trigger account
-/// cleanup when the token set empties here: a multi-device user
-/// signing out of the second device shouldn't lose their prefs.
-///
-/// Hard-delete is reserved for paths that signal a real end-of-life:
-///   - FCM UNREGISTERED (the only reactive hook for app uninstall —
-///     see server/lib/fcm.dart + the callback wired in server/bin/server.dart)
-///   - POST /account/delete (explicit user request)
-///
-/// `oauth/signout` is the soft-delete path; together with the
-/// resurrection in `/oauth/exchange`, a sign-out → sign-in round
-/// trip now preserves every preference.
+/// `POST /devices/signout` — remove one FCM token from the account.
+/// Never triggers account wipe even when the set empties: a multi-
+/// device user signing out of the second device shouldn't lose
+/// their prefs. Hard-delete is reserved for FCM UNREGISTERED
+/// (server/bin/server.dart) and POST /account/delete.
 Handler devicesSignout(
-  ServerConfig config,
   TokenStore tokens,
   TokenAuth auth,
 ) {

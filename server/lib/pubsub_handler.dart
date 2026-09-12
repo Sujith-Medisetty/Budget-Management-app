@@ -13,7 +13,6 @@ import 'package:dio/dio.dart' hide Response;
 import 'package:dio/io.dart';
 import 'package:logging/logging.dart';
 import 'package:pocket_server/accounts_filter_rule_store.dart';
-import 'package:pocket_server/accounts_repo.dart';
 import 'package:pocket_server/envelope_store.dart';
 import 'package:shelf/shelf.dart';
 import 'token_store.dart';

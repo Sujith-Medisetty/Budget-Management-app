@@ -22,10 +22,6 @@ import 'token_store.dart';
 /// "already gone" errors (Firestore 404s are not founds — they mean
 /// the previous attempt did its job). A client retrying after a
 /// transient failure won't double-wipe anything that matters.
-///
-/// Auth: Bearer apiToken. Same scheme as the rest of the mobile-facing
-/// endpoints — only the user themselves can ask to delete their
-/// account.
 Handler accountDeleteHandler(
   ServerConfig config,
   TokenStore tokens,

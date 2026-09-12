@@ -265,11 +265,10 @@ Future<Response> Function(Request) accountsPatchHandler(
           log.info('auto-create on toggle flip: '
               'sub=$sub already has a current-month budget — '
               'no mint');
-        } else {
-          log.info('auto-create on toggle flip: '
-              'sub=$sub userOptedOut (cannot happen after '
-              'pre-transition check; left as defence-in-depth)');
         }
+        // userOptedOut unreachable: autoBudgetTransitionedOn requires
+        // prefs.autoMonthlyBudget=true, so ensureCurrentMonthBudget
+        // can't return userOptedOut here.
       } catch (e, st) {
         log.warning('auto-create on toggle flip failed for '
             'sub=$sub: $e\n$st — toggle save is still committed; '

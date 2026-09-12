@@ -96,7 +96,7 @@ Future<Response?> _authorize({
 
 /// `POST /admin/backup-schedule` — create, update, or delete the
 /// per-user Cloud Scheduler job. Body:
-///   `{ "sub": "<googleSub>", "hour": 22, "minute": 0,
+///   `{ "sub": "&lt;googleSub&gt;", "hour": 22, "minute": 0,
 ///      "timeZone": "America/Los_Angeles", "enabled": true }`
 ///   (the path-param syntax shown is a placeholder — actual sub is
 ///   the user's Google subject id)

@@ -133,22 +133,10 @@ Handler oauthExchange(
       }
     }
 
-    // Three cases for the existing row:
-    //   1. `existing != null && existing.revoked` — user signed out and
-    //      is back. Resurrect: keep every preference the user had set
-    //      (backupPrefs, budgetPrefs, filterRules, timezone, pocketLabelId,
-    //      fcmTokens, lastHistoryId, lastSyncAt, lastBackupAt, createdAt),
-    //      refresh the credentials, clear revoked. The next /devices/register
-    //      adds this device's FCM token; everything else stays put.
-    //   2. `existing != null && !existing.revoked` — same device, same
-    //      Google account, re-authenticating (e.g. token refresh path).
-    //      Same as case 1 minus the revoked flip: preserve prefs, refresh
-    //      credentials. The previous implementation unconditionally
-    //      wrote a fresh defaults-shaped record, which silently wiped
-    //      any prefs the user had set since sign-in — that's the
-    //      same bug as the sign-out path.
-    //   3. `existing == null` — first-ever sign-in for this Google
-    //      account. Create with defaults as today.
+    // Resurrect (existing.revoked), same-device re-auth (existing non-revoked),
+    // and first-ever sign-in (existing null) all share one write path —
+    // `existing.copyWith(...)` preserves the user's prefs across cases 1 and
+    // 2, and the constructor at the bottom handles case 3.
     final existing = await tokens.get(sub);
     final AccountRecord record;
     if (existing != null) {

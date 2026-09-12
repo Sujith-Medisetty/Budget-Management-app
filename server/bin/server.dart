@@ -51,7 +51,7 @@ import 'package:pocket_server/sync.dart';
 /// somewhere the operator isn't watching.
 ///
 /// R2 env vars (all four required):
-///   `R2_ENDPOINT`          e.g. https://<account>.r2.cloudflarestorage.com
+///   `R2_ENDPOINT`          e.g. https://&lt;account&gt;.r2.cloudflarestorage.com
 ///   `R2_BUCKET`            e.g. pocket-backups
 ///   `R2_ACCESS_KEY_ID`     32-char hex
 ///   `R2_SECRET_ACCESS_KEY` long mixed string
@@ -178,11 +178,11 @@ Future<void> main(List<String> args) async {
       ..post('/auth/firebase-token',
           firebaseTokenHandler(tokenAuth, firebaseMinter))
       ..post('/devices/register',
-          devicesRegister(config, tokenStore, cipher, tokenAuth))
+          devicesRegister(tokenStore, tokenAuth))
       ..post('/devices/signout',
-          devicesSignout(config, tokenStore, tokenAuth))
+          devicesSignout(tokenStore, tokenAuth))
       ..delete('/envelope',
-          envelopeDeleteHandler(config, tokenAuth, envelopeStore))
+          envelopeDeleteHandler(tokenAuth, envelopeStore))
       ..get('/sync', syncSince(config, tokenStore, tokenAuth, envelopeStore))
       ..post('/filters/sync',
           filtersSyncHandler(config, tokenStore, cipher, tokenAuth))

@@ -188,23 +188,12 @@ class BudgetsApi {
     }
   }
 
-  /// `PATCH /budgets/match` — push the local budget's alert prefs to
-  /// the server so a sign-in on a different device (or after a
-  /// local DB wipe) can recover them. Match key is `(name,
-  /// startDate)` because the mobile's local autoincrement id and
-  /// the server's UUID id live in different namespaces — the form
-  /// has neither to send.
-  ///
-  /// Returns true on success (200) OR when the budget is
-  /// locally-only on this device (404 — manual creation, no server
-  /// counterpart). The mobile treats 404 as a successful no-op so
-  /// the same call site works for both auto-created and manual
-  /// budgets without branching.
-  ///
-  /// Throws on transport failures (timeout, 5xx with body, DNS) —
-  /// the caller logs and moves on since the local SQLite has
-  /// already been updated and the R2 backup is the next-best path
-  /// to a cross-device restore.
+  /// `PATCH /budgets/match` — push alert prefs to the server so a
+  /// sign-in on another device (or after a local DB wipe) can recover
+  /// them. Match key is `(name, startDate)` since the mobile autoincrement
+  /// id and the server UUID id live in different namespaces. Returns true
+  /// on 200 or 404 (manual budgets have no server row); throws on transport
+  /// failures so the caller can log and move on.
   Future<bool> patchAlertPrefs({
     required String name,
     required DateTime startDate,

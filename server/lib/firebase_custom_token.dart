@@ -13,13 +13,13 @@ import 'package:logging/logging.dart';
 /// Wire format reference:
 /// https://firebase.google.com/docs/auth/admin/create-custom-tokens
 ///
-///   Header:  `{ "alg": "RS256", "kid": "<private_key_id>", "typ": "JWT" }`
+///   Header:  `{ "alg": "RS256", "kid": "&lt;private_key_id&gt;", "typ": "JWT" }`
 ///   Payload: ```
 ///     {
 ///       "aud": "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
-///       "iss": "<client_email>",
-///       "sub": "<client_email>",
-///       "uid": "<user uid to sign in as>",
+///       "iss": "&lt;client_email&gt;",
+///       "sub": "&lt;client_email&gt;",
+///       "uid": "&lt;user uid to sign in as&gt;",
 ///       "iat": &lt;unix seconds now&gt;,
 ///       "exp": &lt;unix seconds now + 3600&gt;
 ///     }

@@ -19,10 +19,9 @@ import 'dart:math';
 import 'package:dotenv/dotenv.dart';
 import 'package:logging/logging.dart';
 
-import 'package:pocket_server/envelope_store.dart';
-import 'package:pocket_server/accounts_repo.dart';
 import 'package:pocket_server/accounts_repo.dart' show AccountsRepo, pgEndpointFromEnv;
 import 'package:pocket_server/config.dart';
+import 'package:pocket_server/envelope_store.dart';
 import 'package:pocket_server/fcm.dart';
 
 import 'package:pocket_server/token_store.dart';

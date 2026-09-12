@@ -1,5 +1,4 @@
 import 'auth.dart';
-import 'config.dart';
 import 'package:logging/logging.dart';
 import 'package:pocket_server/envelope_store.dart';
 import 'package:shelf/shelf.dart';
@@ -17,7 +16,6 @@ import 'package:shelf/shelf.dart';
 /// delete is a no-op (the Firestore 24h TTL may have already cleared
 /// it).
 Handler envelopeDeleteHandler(
-  ServerConfig config,
   TokenAuth auth,
   EnvelopeStore envelopes,
 ) {

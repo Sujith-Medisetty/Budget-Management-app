@@ -66,13 +66,13 @@ void main() {
       auth.signApiToken(sub: 'other-sub', ttl: const Duration(hours: 1));
 
   test('returns 401 without bearer', () async {
-    final h = envelopeDeleteHandler(_config, auth, _FakeStore());
+    final h = envelopeDeleteHandler(auth, _FakeStore());
     final r = await h(Request('DELETE', Uri.parse('http://test/envelope?messageId=x')));
     expect(r.statusCode, 401);
   });
 
   test('returns 400 when messageId missing', () async {
-    final h = envelopeDeleteHandler(_config, auth, _FakeStore());
+    final h = envelopeDeleteHandler(auth, _FakeStore());
     final r = await h(_bearer(ownerToken));
     expect(r.statusCode, 400);
   });
@@ -83,7 +83,7 @@ void main() {
       'sub': 'owner-sub',
       'from': '', 'subject': '', 'text': '', 'date': '2026-09-07T00:00:00Z',
     });
-    final h = envelopeDeleteHandler(_config, auth, store);
+    final h = envelopeDeleteHandler(auth, store);
     final r = await h(_bearer(ownerToken, messageId: 'm1'));
     expect(r.statusCode, 200);
     expect(store.deleteCalls, 1);
@@ -95,7 +95,7 @@ void main() {
       'sub': 'owner-sub',
       'from': '', 'subject': '', 'text': '', 'date': '2026-09-07T00:00:00Z',
     });
-    final h = envelopeDeleteHandler(_config, auth, store);
+    final h = envelopeDeleteHandler(auth, store);
     final r = await h(_bearer(otherToken, messageId: 'm1'));
     expect(r.statusCode, 403);
     expect(store.deleteCalls, 0);
@@ -103,7 +103,7 @@ void main() {
 
   test('returns 200 already-gone when envelope is null (TTL cleared it)', () async {
     final store = _FakeStore(envelope: null);
-    final h = envelopeDeleteHandler(_config, auth, store);
+    final h = envelopeDeleteHandler(auth, store);
     final r = await h(_bearer(ownerToken, messageId: 'm1'));
     expect(r.statusCode, 200);
     expect(await r.readAsString(), 'already-gone');
