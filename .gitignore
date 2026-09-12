@@ -51,6 +51,12 @@ app.*.map.json
 /secrets/
 /server/.env
 /server/.gcp/
+/android/app/google-services.json
+/android/app/google-services.json.template
+/ios/Runner/GoogleService-Info.plist
+/firebase.json
+/firestore.rules
+/firestore.indexes.json
 
 # Pocket — Oracle VM deploy artifacts
 pocket-vm-key*
