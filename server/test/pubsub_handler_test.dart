@@ -115,6 +115,7 @@ class _FakeWatchRegistrar extends GmailWatchRegistrar {
     String sub,
     String refreshTokenPlain, {
     String? pocketLabelId,
+    String? accessToken,
   }) async {
     refreshes.add((
       sub: sub,

@@ -113,8 +113,9 @@ Future<Response> Function(Request) filtersSyncHandler(
       return Response.forbidden('revoked');
     }
     String accessToken;
+    String refreshPlain;
     try {
-      final refreshPlain = await cipher.open(record.refreshToken);
+      refreshPlain = await cipher.open(record.refreshToken);
       accessToken = await exchange0(refreshPlain);
     } catch (e) {
       log.warning('refresh-token exchange failed for $sub: $e');
@@ -210,10 +211,20 @@ Future<Response> Function(Request) filtersSyncHandler(
     // server-side allows() decides); Pocket label when all non-empty
     // rules are mirrored (so Pub/Sub only fires for matching emails).
     // Idempotent — calls users.watch even if mode didn't change, which
-    // also resets the ~7-day expiry. Watch is cheap (one HTTPS call).
+    // also resets the ~7-day expiry.
+    //
+    // Pass the access_token we already minted above so watch.refresh
+    // skips its own oauth2.googleapis.com exchange. refreshPlain is
+    // kept as the second arg for the type signature but is unused
+    // when accessToken is provided.
     final wanted = desiredWatchLabelId(newSet, record.pocketLabelId);
     try {
-      await watch0.refresh(sub ?? '', accessToken, pocketLabelId: wanted);
+      await watch0.refresh(
+        sub ?? '',
+        refreshPlain,
+        pocketLabelId: wanted,
+        accessToken: accessToken,
+      );
     } catch (e) {
       log.warning('watch reconcile after sync failed for $sub: $e');
     }

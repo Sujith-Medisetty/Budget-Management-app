@@ -61,12 +61,21 @@ class GmailWatchRegistrar {
   /// server-side `FilterRuleSet.allows()` check providing the safety
   /// net. `pubsub_handler` self-heals legacy accounts on the next
   /// push by calling `ensurePocketLabelId` and re-registering.
+  ///
+  /// When [accessToken] is provided, the refresh skips the
+  /// refresh_token → access_token exchange and reuses it directly.
+  /// Saves one oauth2.googleapis.com roundtrip on the Pub/Sub push
+  /// path, where the caller already minted a token for history.list
+  /// and would otherwise pay for a second exchange. Falls back to
+  /// the exchange when null (sign-in flow, where no other token is
+  /// available yet).
   Future<void> refresh(
     String sub,
     String refreshTokenPlain, {
     String? pocketLabelId,
+    String? accessToken,
   }) async {
-    final accessToken = await exchangeForAccessToken(refreshTokenPlain);
+    final at = accessToken ?? await exchangeForAccessToken(refreshTokenPlain);
 
     // Step 2: call users.watch with the access token.
     final body = <String, dynamic>{
@@ -85,7 +94,7 @@ class GmailWatchRegistrar {
       Uri.parse(
           'https://gmail.googleapis.com/gmail/v1/users/me/watch'),
       headers: {
-        'authorization': 'Bearer $accessToken',
+        'authorization': 'Bearer $at',
         'content-type': 'application/json',
       },
       body: jsonEncode(body),

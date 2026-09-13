@@ -151,14 +151,19 @@ Handler pubsubHandler(
       }
     }
 
-    // Reconcile watch mode against current rule state. Idempotent —
-    // safe to call on every push. Watches are cheap (one HTTPS call)
-    // and resetting the expiry is fine. The whole point: an account
-    // can flip between INBOX and label mode as the user adds/deletes
-    // filters, and the next push fixes the watch accordingly. This
-    // also catches legacy accounts that signed in before the
-    // label-scheme change — they'll migrate naturally as soon as the
-    // user opens Email filters and saves.
+    // Reconcile watch mode against current rule state. Throttled: only
+    // re-register `users.watch()` when the watch is missing, expired,
+    // or about to expire (<24h remaining). Gmail's watch expires ~7
+    // days after registration, so refreshing once per 24h keeps a
+    // comfortable buffer. Skipping the rest of the time saves an
+    // oauth2.googleapis.com roundtrip + a Gmail API call per push
+    // (the access_token exchange happens via the shared [accessToken]
+    // when we DO refresh — see the accessToken param below).
+    //
+    // Mode changes (user adds/removes Gmail-mirrored filters) propagate
+    // via /filters/sync which also calls watch.refresh; that path
+    // runs whenever the user saves filter rules, so the daily
+    // throttle here is the safety net, not the primary sync.
     FilterRuleSet ruleSet = FilterRuleSet.defaults;
     try {
       await rules0.init();
@@ -168,17 +173,33 @@ Handler pubsubHandler(
           'using defaults (will keep INBOX watch)');
     }
     final wanted = desiredWatchLabelId(ruleSet, record0.pocketLabelId);
-    try {
-      await watch0.refresh(
-        record0.sub,
-        refreshPlain,
-        pocketLabelId: wanted,
-      );
-      log.info('watch reconciled for $email: '
-          'pocketLabelId=${record0.pocketLabelId}, '
-          'mode=${wanted == null ? 'INBOX' : 'label'}');
-    } catch (e) {
-      log.warning('watch reconcile failed for $email: $e');
+    final sinceLast = DateTime.now().toUtc().difference(record0.lastWatchAt);
+    // Gmail's watch expires ~7 days after registration, so refreshing
+    // when we're past the 6-day safety mark keeps a comfortable
+    // buffer. Mode changes propagate via /filters/sync which also
+    // calls watch.refresh.
+    final staleOrExpired = sinceLast >= const Duration(days: 6);
+    if (staleOrExpired) {
+      try {
+        await watch0.refresh(
+          record0.sub,
+          refreshPlain,
+          pocketLabelId: wanted,
+          // Reuse the access_token we already minted for history.list
+          // instead of triggering a second oauth2.googleapis.com
+          // roundtrip. watch.refresh falls back to its own exchange
+          // when this is null.
+          accessToken: accessToken,
+        );
+        log.info('watch reconciled for $email: '
+            'pocketLabelId=${record0.pocketLabelId}, '
+            'mode=${wanted == null ? 'INBOX' : 'label'}');
+      } catch (e) {
+        log.warning('watch reconcile failed for $email: $e');
+      }
+    } else {
+      log.info('watch skip for $email '
+          '(refreshed ${sinceLast.inHours}h ago, mode unchanged)');
     }
 
     final startHistoryId = record.lastHistoryId ?? historyId ?? '1';
