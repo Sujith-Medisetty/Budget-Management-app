@@ -117,13 +117,16 @@ Handler oauthExchange(
     // hasn't propagated it yet), we still complete sign-in but log
     // loudly — the pubsub_handler will self-heal on the next push.
     String? pocketLabelId;
+    // Lifted out of the try so the access_token survives partial
+    // failure of label creation — we reuse it for users.watch below.
+    String? labelAccessToken;
     if (config.oauthTestMode) {
       log.info('OAUTH_TEST_MODE: skipping label creation for $sub');
       // In test mode the FakeLabelManager or watch will inject one.
       pocketLabelId = null;
     } else {
       try {
-        final labelAccessToken = await watch.exchangeForAccessToken(refreshToken);
+        labelAccessToken = await watch.exchangeForAccessToken(refreshToken);
         pocketLabelId =
             await GmailLabelManager(accessToken: labelAccessToken, config: config)
                 .ensurePocketLabelId();
@@ -189,7 +192,8 @@ Handler oauthExchange(
       log.info('OAUTH_TEST_MODE: skipping users.watch for $sub');
     } else {
       try {
-        await watch.refresh(sub, refreshToken, pocketLabelId: null);
+        await watch.refresh(sub, refreshToken, pocketLabelId: null,
+            accessToken: labelAccessToken);
       } catch (e) {
         log.severe('users.watch failed for $sub: $e');
         // Don't fail the whole sign-in — token is persisted, the
