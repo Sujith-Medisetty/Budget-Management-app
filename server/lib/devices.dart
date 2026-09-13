@@ -64,11 +64,9 @@ Handler devicesRegister(
   };
 }
 
-/// `POST /devices/signout` — remove one FCM token from the account.
-/// Never triggers account wipe even when the set empties: a multi-
-/// device user signing out of the second device shouldn't lose
-/// their prefs. Hard-delete is reserved for FCM UNREGISTERED
-/// (server/bin/server.dart) and POST /account/delete.
+/// `POST /devices/signout` — remove one FCM token. Never triggers
+/// account wipe; that's reserved for FCM UNREGISTERED and
+/// POST /account/delete.
 Handler devicesSignout(
   TokenStore tokens,
   TokenAuth auth,
@@ -111,13 +109,8 @@ Handler devicesSignout(
     log.info('unregistered fcmToken for ${record.email} '
         '(remaining=${remaining.length})');
 
-    // No account wipe here, ever. The old code called
-    // deleteAccountCompletely when remaining.isEmpty, which wiped
-    // prefs along with the row — a sign-out → sign-in round trip
-    // dropped the user back to defaults. Today the user has to
-    // explicitly tap "Delete account" in Settings, or the FCM
-    // UNREGISTERED signal has to fire (real uninstall), for a
-    // hard-delete to happen.
+    // No wipe here — a multi-device signout emptying the token set
+    // must not lose user prefs.
     return Response.ok('ok');
   };
 }
